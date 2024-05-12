@@ -1,4 +1,6 @@
 #include <ControllerDriver.h>
+#include <Windows.h>
+#include <Xinput.h>
 
 EVRInitError ControllerDriver::Activate(uint32_t unObjectId)
 {
@@ -10,12 +12,12 @@ EVRInitError ControllerDriver::Activate(uint32_t unObjectId)
 	VRProperties()->SetInt32Property(props, Prop_ControllerRoleHint_Int32, ETrackedControllerRole::TrackedControllerRole_Treadmill); //tells OpenVR what kind of device this is
 	VRDriverInput()->CreateScalarComponent(props, "/input/joystick/y", &joystickYHandle, EVRScalarType::VRScalarType_Absolute,
 		EVRScalarUnits::VRScalarUnits_NormalizedTwoSided); //sets up handler you'll use to send joystick commands to OpenVR with, in the Y direction (forward/backward)
-	VRDriverInput()->CreateScalarComponent(props, "/input/trackpad/y", &trackpadYHandle, EVRScalarType::VRScalarType_Absolute,
-		EVRScalarUnits::VRScalarUnits_NormalizedTwoSided); //sets up handler you'll use to send trackpad commands to OpenVR with, in the Y direction
+	//VRDriverInput()->CreateScalarComponent(props, "/input/trackpad/y", &trackpadYHandle, EVRScalarType::VRScalarType_Absolute,
+	//	EVRScalarUnits::VRScalarUnits_NormalizedTwoSided); //sets up handler you'll use to send trackpad commands to OpenVR with, in the Y direction
 	VRDriverInput()->CreateScalarComponent(props, "/input/joystick/x", &joystickXHandle, EVRScalarType::VRScalarType_Absolute,
 		EVRScalarUnits::VRScalarUnits_NormalizedTwoSided); //Why VRScalarType_Absolute? Take a look at the comments on EVRScalarType.
-	VRDriverInput()->CreateScalarComponent(props, "/input/trackpad/x", &trackpadXHandle, EVRScalarType::VRScalarType_Absolute,
-		EVRScalarUnits::VRScalarUnits_NormalizedTwoSided); //Why VRScalarUnits_NormalizedTwoSided? Take a look at the comments on EVRScalarUnits.
+	//VRDriverInput()->CreateScalarComponent(props, "/input/trackpad/x", &trackpadXHandle, EVRScalarType::VRScalarType_Absolute,
+	//	EVRScalarUnits::VRScalarUnits_NormalizedTwoSided); //Why VRScalarUnits_NormalizedTwoSided? Take a look at the comments on EVRScalarUnits.
 	
 	//The following properites are ones I tried out because I saw them in other samples, but I found they were not needed to get the sample working.
 	//There are many samples, take a look at the openvr_header.h file. You can try them out.
@@ -53,14 +55,27 @@ DriverPose_t ControllerDriver::GetPose()
 	return pose;
 }
 
-void ControllerDriver::RunFrame()
-{
-	//Since we used VRScalarUnits_NormalizedTwoSided as the unit, the range is -1 to 1.
-	VRDriverInput()->UpdateScalarComponent(joystickYHandle, 0.95f, 0); //move forward
-	VRDriverInput()->UpdateScalarComponent(trackpadYHandle, 0.95f, 0); //move foward
-	VRDriverInput()->UpdateScalarComponent(joystickXHandle, 0.0f, 0); //change the value to move sideways
-	VRDriverInput()->UpdateScalarComponent(trackpadXHandle, 0.0f, 0); //change the value to move sideways
+
+void ControllerDriver::RunFrame() {
+	XINPUT_STATE state;
+	DWORD result = XInputGetState(0, &state);
+
+	if (result == ERROR_SUCCESS) {
+		// Leggi gli assi X e Y dal controller
+		float xAxis = state.Gamepad.sThumbLX / 32768.0f; // Normalizza il valore tra -1 e 1
+		float yAxis = state.Gamepad.sThumbLY / 32768.0f; // Normalizza il valore tra -1 e 1
+
+		// Aggiorna i componenti scalari degli assi X e Y
+		VRDriverInput()->UpdateScalarComponent(joystickXHandle, xAxis, 0);
+		VRDriverInput()->UpdateScalarComponent(joystickYHandle, yAxis, 0);
+	}
+	else {
+		// Se non riesce a leggere lo stato del controller, potrebbe non essere connesso
+		// Puoi gestire questa situazione come desideri, ad esempio mantenendo i valori precedenti
+		// o segnalando un errore
+	}
 }
+
 
 void ControllerDriver::Deactivate()
 {
