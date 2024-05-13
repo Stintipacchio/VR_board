@@ -1,5 +1,6 @@
 #include <HX711_ADC.h>
 #include <Joystick.h>
+// #include <XInput.h>
 
 Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID,JOYSTICK_TYPE_GAMEPAD,
   1, 0,                  // Button Count, Hat Switch Count
@@ -11,6 +12,53 @@ Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID,JOYSTICK_TYPE_GAMEPAD,
 #if defined(ESP8266)|| defined(ESP32) || defined(AVR)
 #include <EEPROM.h>
 #endif
+
+float R4_COORD[2];
+float R3_COORD[2];
+float R2_COORD[2];
+float R1_COORD[2];
+
+float B4_COORD[2];
+float B3_COORD[2];
+float B2_COORD[2];
+float B1_COORD[2];
+
+float X = 0;
+float Y = 0;
+
+float last_X = 0;
+float last_Y = 0;
+
+void direction(float i_R4, float i_R3, float i_R2, float i_R1, float i_B4, float i_B3, float i_B2, float i_B1, float& X, float& Y) {
+    if (i_R1 > 0.5 && i_R1 > i_R2 && i_R1 > i_R3 && i_R1 > i_R4) {
+        X = R1_COORD[0];
+        Y = R1_COORD[1];
+    } else if (i_R2 > 0.5 && i_R2 > i_R1 && i_R2 > i_R3 && i_R2 > i_R4) {
+        X = R2_COORD[0];
+        Y = R2_COORD[1];
+    } else if (i_R3 > 0.5 && i_R3 > i_R1 && i_R3 > i_R2 && i_R3 > i_R4) {
+        X = R3_COORD[0];
+        Y = R3_COORD[1];
+    } else if (i_R4 > 0.5 && i_R4 > i_R1 && i_R4 > i_R2 && i_R4 > i_R3) {
+        X = R4_COORD[0];
+        Y = R4_COORD[1];
+    } else if (i_B1 > 0.5 && i_B1 > i_B2 && i_B1 > i_B3 && i_B1 > i_B4) {
+        X = B1_COORD[0];
+        Y = B1_COORD[1];
+    } else if (i_B2 > 0.5 && i_B2 > i_B1 && i_B2 > i_B3 && i_B2 > i_B4) {
+        X = B2_COORD[0];
+        Y = B2_COORD[1];
+    } else if (i_B3 > 0.5 && i_B3 > i_B1 && i_B3 > i_B2 && i_B3 > i_B4) {
+        X = B3_COORD[0];
+        Y = B3_COORD[1];
+    } else if (i_B4 > 0.5 && i_B4 > i_B1 && i_B4 > i_B2 && i_B4 > i_B3) {
+        X = B4_COORD[0];
+        Y = B4_COORD[1];
+    }else{
+      X = 0;
+      Y = 0;
+    }
+}
 
 // Pins for the load cells
 
@@ -41,11 +89,32 @@ const int calVal_eepromAdress = 0;
 const int tareOffsetVal_eepromAdress = 4;
 unsigned long t = 0;
 
-float mapValue(float value, float minInput, float maxInput, float minOutput, float maxOutput) {
-    return (value - minInput) * (maxOutput - minOutput) / (maxInput - minInput) + minOutput;
-}
-
 void setup() {
+  R4_COORD[0] = -100;
+  R4_COORD[1] = 0;
+
+  R3_COORD[0] = -100;
+  R3_COORD[1] = 100;
+
+  R2_COORD[0] = 0;
+  R2_COORD[1] = 100;
+
+  R1_COORD[0] = 100;
+  R1_COORD[1] = 100;
+
+
+  B4_COORD[0] = 100;
+  B4_COORD[1] = 0;
+
+  B3_COORD[0] = 100;
+  B3_COORD[1] = -100;
+
+  B2_COORD[0] = 0;
+  B2_COORD[1] = -100;
+
+  B1_COORD[0] = -100;
+  B1_COORD[1] = -100;
+
   Serial.begin(57600);
   delay(10);
   Serial.println();
@@ -129,6 +198,8 @@ void setup() {
   Joystick.begin();
   Joystick.setXAxisRange(-100, 100);
   Joystick.setYAxisRange(-100, 100);
+  // XInput.setJoystickRange(-100, 100);
+  // XInput.begin();
 
   refreshOffsetValuesAndSaveToEEPROM();
 }
@@ -176,23 +247,23 @@ void loop() {
       float i_B1 = abs(B1_LoadCell.getData());
 
       // Print load cell values
-      // Serial.print("Load_cell R4 output val: ");
-      // Serial.println(i_R4);
-      // Serial.print("Load_cell R3 output val: ");
-      // Serial.println(i_R3);
-      // Serial.print("Load_cell R2 output val: ");
-      // Serial.println(i_R2);
-      // Serial.print("Load_cell R1 output val: ");
-      // Serial.println(i_R1);
+      Serial.print("Load_cell R4 output val: ");
+      Serial.println(i_R4);
+      Serial.print("Load_cell R3 output val: ");
+      Serial.println(i_R3);
+      Serial.print("Load_cell R2 output val: ");
+      Serial.println(i_R2);
+      Serial.print("Load_cell R1 output val: ");
+      Serial.println(i_R1);
 
-      // Serial.print("Load_cell B4 output val: ");
-      // Serial.println(i_B4);
-      // Serial.print("Load_cell B3 output val: ");
-      // Serial.println(i_B3);
-      // Serial.print("Load_cell B2 output val: ");
-      // Serial.println(i_B2);
-      // Serial.print("Load_cell B1 output val: ");
-      // Serial.println(i_B1);
+      Serial.print("Load_cell B4 output val: ");
+      Serial.println(i_B4);
+      Serial.print("Load_cell B3 output val: ");
+      Serial.println(i_B3);
+      Serial.print("Load_cell B2 output val: ");
+      Serial.println(i_B2);
+      Serial.print("Load_cell B1 output val: ");
+      Serial.println(i_B1);
 
       // Reset data readiness flags
       newDataReady_R4 = false;
@@ -209,21 +280,44 @@ void loop() {
       t = millis();
 
       // Calculate joystick axes
-      float X = ((i_B4 + (i_R1/2) + (i_B3/2)) - (i_R4 + (i_R3/2) + (i_B1/2)))*30;
-      float Y = ((i_R2 + (i_R1/2) + (i_R3/2)) - (i_B2 + (i_B1/2) + (i_B3/2)))*30;
+      // X = ((i_B4 + (i_R1/2) + (i_B3/2)) - (i_R4 + (i_R3/2) + (i_B1/2)))*10;
+      // Y = ((i_R2 + (i_R1/2) + (i_R3/2)) - (i_B2 + (i_B1/2) + (i_B3/2)))*10;
+
+      // if (X > last_X + 30 || X < last_X - 30){ X = last_X; Serial.println("AAAAAAAAAAAAAAAAAAAAAAAAAA");}
+      // if (Y > last_Y + 30 || Y < last_Y - 30){ Y = last_Y; Serial.println("BBBBBBBBBBBBBBBBBBBBBBBBBB");}
+
+
       
-      if (X < -100 || X > 100 || Y < -100 || Y > 100) Joystick.setButton(0, true);
-      else Joystick.setButton(0, false);
+      // if (X < -100 || X > 100 || Y < -100 || Y > 100) Joystick.setButton(0, true);
+      // else Joystick.setButton(0, false);
+
+      // last_X = X;
+      // last_Y = Y;
+
+      // if(X > last_X + 5) X = 80;
+      // if(X < last_X - 5) X = -80;
       
+      // if(Y > last_X + 5) Y = 80;
+      // if(Y < last_X - 5) Y = -80;
+
+      direction(i_R4, i_R3, i_R2, i_R1, i_B4, i_B3, i_B2, i_B1, X, Y);
+
+
       // Print of the coordinates
       Serial.print("X coordinate: ");
       Serial.println(X);
       Serial.print("Y coordinate: ");
       Serial.println(Y);
 
+
       // Set joystick axes
       Joystick.setXAxis(X);
       Joystick.setYAxis(Y);
+      // XInput.setJoystick(JOY_LEFT, -X, Y);  // Clockwise
+      // // Send values to PC
+	    // XInput.send();
+
+
     }
   }
 
@@ -231,12 +325,10 @@ void loop() {
   if (Serial.available() > 0) {
     char inByte = Serial.read();
     if (inByte == 't') refreshOffsetValuesAndSaveToEEPROM();
+    last_X = 0;
+    last_Y = 0;
   }
 }
-
-
-
-
 
 void refreshOffsetValuesAndSaveToEEPROM() {
   long _offset_R4 = 0;
