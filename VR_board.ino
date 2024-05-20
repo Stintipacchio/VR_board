@@ -13,52 +13,16 @@ Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID,JOYSTICK_TYPE_GAMEPAD,
 #include <EEPROM.h>
 #endif
 
-float R4_COORD[2];
-float R3_COORD[2];
-float R2_COORD[2];
-float R1_COORD[2];
-
-float B4_COORD[2];
-float B3_COORD[2];
-float B2_COORD[2];
-float B1_COORD[2];
-
 float X = 0;
 float Y = 0;
 
 float last_X = 0;
 float last_Y = 0;
 
-void direction(float i_R4, float i_R3, float i_R2, float i_R1, float i_B4, float i_B3, float i_B2, float i_B1, float& X, float& Y) {
-    if (i_R1 > 0.5 && i_R1 > i_R2 && i_R1 > i_R3 && i_R1 > i_R4) {
-        X = R1_COORD[0];
-        Y = R1_COORD[1];
-    } else if (i_R2 > 0.5 && i_R2 > i_R1 && i_R2 > i_R3 && i_R2 > i_R4) {
-        X = R2_COORD[0];
-        Y = R2_COORD[1];
-    } else if (i_R3 > 0.5 && i_R3 > i_R1 && i_R3 > i_R2 && i_R3 > i_R4) {
-        X = R3_COORD[0];
-        Y = R3_COORD[1];
-    } else if (i_R4 > 0.5 && i_R4 > i_R1 && i_R4 > i_R2 && i_R4 > i_R3) {
-        X = R4_COORD[0];
-        Y = R4_COORD[1];
-    } else if (i_B1 > 0.5 && i_B1 > i_B2 && i_B1 > i_B3 && i_B1 > i_B4) {
-        X = B1_COORD[0];
-        Y = B1_COORD[1];
-    } else if (i_B2 > 0.5 && i_B2 > i_B1 && i_B2 > i_B3 && i_B2 > i_B4) {
-        X = B2_COORD[0];
-        Y = B2_COORD[1];
-    } else if (i_B3 > 0.5 && i_B3 > i_B1 && i_B3 > i_B2 && i_B3 > i_B4) {
-        X = B3_COORD[0];
-        Y = B3_COORD[1];
-    } else if (i_B4 > 0.5 && i_B4 > i_B1 && i_B4 > i_B2 && i_B4 > i_B3) {
-        X = B4_COORD[0];
-        Y = B4_COORD[1];
-    }else{
-      X = 0;
-      Y = 0;
-    }
-}
+const int PIN_BT_1 = 1;
+const int PIN_BT_2 = 2;
+const int PIN_BT_3 = 3;
+const int PIN_BT_4 = 4;
 
 // Pins for the load cells
 
@@ -67,7 +31,7 @@ const int PIN_R3 = 6;
 const int PIN_R2 = 7;
 const int PIN_R1 = 8;
 
-const int PIN_B4 = 3;
+const int PIN_B4 = 9;
 const int PIN_B3 = 10;
 const int PIN_B2 = 11;
 const int PIN_B1 = 12;
@@ -90,32 +54,13 @@ const int tareOffsetVal_eepromAdress = 4;
 unsigned long t = 0;
 
 void setup() {
-  R4_COORD[0] = -100;
-  R4_COORD[1] = 0;
-
-  R3_COORD[0] = -100;
-  R3_COORD[1] = 100;
-
-  R2_COORD[0] = 0;
-  R2_COORD[1] = 100;
-
-  R1_COORD[0] = 100;
-  R1_COORD[1] = 100;
-
-
-  B4_COORD[0] = 100;
-  B4_COORD[1] = 0;
-
-  B3_COORD[0] = 100;
-  B3_COORD[1] = -100;
-
-  B2_COORD[0] = 0;
-  B2_COORD[1] = -100;
-
-  B1_COORD[0] = -100;
-  B1_COORD[1] = -100;
-
   Serial.begin(57600);
+
+  pinMode(PIN_BT_1, INPUT_PULLUP);
+  pinMode(PIN_BT_2, INPUT_PULLUP);
+  pinMode(PIN_BT_3, INPUT_PULLUP);
+  pinMode(PIN_BT_4, INPUT_PULLUP);
+
   delay(10);
   Serial.println();
   Serial.println("Starting...");
@@ -204,6 +149,42 @@ void setup() {
   refreshOffsetValuesAndSaveToEEPROM();
 }
 
+
+int buttons_control(int val_BT, bool sign){
+  if (val_BT == HIGH){
+    if (sign) return 50;
+    else return - 50;
+  }
+  else if (val_BT == LOW){
+    return 0;
+  }
+}
+
+float last_i_R4 = 0;
+float last_i_R3 = 0;
+float last_i_R2 = 0;
+float last_i_R1 = 0;
+
+float last_i_B4 = 0;
+float last_i_B3 = 0;
+float last_i_B2 = 0;
+float last_i_B1 = 0;
+
+const float threshold = 4.0;
+
+float checkVariation(float currentValue, float lastValue, String label) {
+    if (abs(currentValue - lastValue) > threshold) {
+        Serial.print("Variazione significativa in ");
+        Serial.print(label);
+        Serial.print(": ");
+        Serial.print(lastValue);
+        Serial.print(" -> ");
+        Serial.println(currentValue);
+        return lastValue; // Sovrascrive il nuovo valore con il precedente
+    }
+    return currentValue; // Mantiene il nuovo valore se la variazione non supera la soglia
+}
+
 void loop() {
   // Flags to track data readiness for each load cell
   static boolean newDataReady_R4 = false;
@@ -246,24 +227,29 @@ void loop() {
       float i_B2 = abs(B2_LoadCell.getData());
       float i_B1 = abs(B1_LoadCell.getData());
 
-      // Print load cell values
-      Serial.print("Load_cell R4 output val: ");
-      Serial.println(i_R4);
-      Serial.print("Load_cell R3 output val: ");
-      Serial.println(i_R3);
-      Serial.print("Load_cell R2 output val: ");
-      Serial.println(i_R2);
-      Serial.print("Load_cell R1 output val: ");
-      Serial.println(i_R1);
+      int val_BT_1 = !digitalRead(PIN_BT_1);
+      int val_BT_2 = !digitalRead(PIN_BT_2);
+      int val_BT_3 = !digitalRead(PIN_BT_3);
+      int val_BT_4 = !digitalRead(PIN_BT_4);
 
-      Serial.print("Load_cell B4 output val: ");
-      Serial.println(i_B4);
-      Serial.print("Load_cell B3 output val: ");
-      Serial.println(i_B3);
-      Serial.print("Load_cell B2 output val: ");
-      Serial.println(i_B2);
-      Serial.print("Load_cell B1 output val: ");
-      Serial.println(i_B1);
+      // Print load cell values
+      // Serial.print("Load_cell R4 output val: ");
+      // Serial.println(i_R4);
+      // Serial.print("Load_cell R3 output val: ");
+      // Serial.println(i_R3);
+      // Serial.print("Load_cell R2 output val: ");
+      // Serial.println(i_R2);
+      // Serial.print("Load_cell R1 output val: ");
+      // Serial.println(i_R1);
+
+      // Serial.print("Load_cell B4 output val: ");
+      // Serial.println(i_B4);
+      // Serial.print("Load_cell B3 output val: ");
+      // Serial.println(i_B3);
+      // Serial.print("Load_cell B2 output val: ");
+      // Serial.println(i_B2);
+      // Serial.print("Load_cell B1 output val: ");
+      // Serial.println(i_B1);
 
       // Reset data readiness flags
       newDataReady_R4 = false;
@@ -276,39 +262,35 @@ void loop() {
       newDataReady_B2 = false;
       newDataReady_B1 = false;
 
+      //false positive check
+
+      i_R4 = checkVariation(i_R4, last_i_R4, "R4");
+      i_R3 = checkVariation(i_R3, last_i_R3, "R3");
+      i_R2 = checkVariation(i_R2, last_i_R2, "R2");
+      i_R1 = checkVariation(i_R1, last_i_R1, "R1");
+
+      i_B4 = checkVariation(i_B4, last_i_B4, "B4");
+      i_B3 = checkVariation(i_B3, last_i_B3, "B3");
+      i_B2 = checkVariation(i_B2, last_i_B2, "B2");
+      i_B1 = checkVariation(i_B1, last_i_B1, "B1");
+
+
       // Update time
       t = millis();
 
       // Calculate joystick axes
-      // X = ((i_B4 + (i_R1/2) + (i_B3/2)) - (i_R4 + (i_R3/2) + (i_B1/2)))*10;
-      // Y = ((i_R2 + (i_R1/2) + (i_R3/2)) - (i_B2 + (i_B1/2) + (i_B3/2)))*10;
-
-      // if (X > last_X + 30 || X < last_X - 30){ X = last_X; Serial.println("AAAAAAAAAAAAAAAAAAAAAAAAAA");}
-      // if (Y > last_Y + 30 || Y < last_Y - 30){ Y = last_Y; Serial.println("BBBBBBBBBBBBBBBBBBBBBBBBBB");}
-
+      X = (((i_B4 + (i_R1/2) + (i_B3/2)) - (i_R4 + (i_R3/2) + (i_B1/2)))*10) + buttons_control(val_BT_1, false) + buttons_control(val_BT_3, true);
+      Y = (((i_R2 + (i_R1/2) + (i_R3/2)) - (i_B2 + (i_B1/2) + (i_B3/2)))*10) + buttons_control(val_BT_2, true) + buttons_control(val_BT_4, false);
 
       
-      // if (X < -100 || X > 100 || Y < -100 || Y > 100) Joystick.setButton(0, true);
-      // else Joystick.setButton(0, false);
-
-      // last_X = X;
-      // last_Y = Y;
-
-      // if(X > last_X + 5) X = 80;
-      // if(X < last_X - 5) X = -80;
-      
-      // if(Y > last_X + 5) Y = 80;
-      // if(Y < last_X - 5) Y = -80;
-
-      direction(i_R4, i_R3, i_R2, i_R1, i_B4, i_B3, i_B2, i_B1, X, Y);
-
+      if (X < -100 || X > 100 || Y < -100 || Y > 100) Joystick.setButton(0, true);
+      else Joystick.setButton(0, false);
 
       // Print of the coordinates
       Serial.print("X coordinate: ");
       Serial.println(X);
       Serial.print("Y coordinate: ");
       Serial.println(Y);
-
 
       // Set joystick axes
       Joystick.setXAxis(X);
@@ -317,7 +299,15 @@ void loop() {
       // // Send values to PC
 	    // XInput.send();
 
+      last_i_R4 = i_R4;
+      last_i_R3 = i_R3;
+      last_i_R2 = i_R2;
+      last_i_R1 = i_R1;
 
+      last_i_B4 = i_B4;
+      last_i_B3 = i_B3;
+      last_i_B2 = i_B2;
+      last_i_B1 = i_B1;
     }
   }
 
@@ -328,6 +318,7 @@ void loop() {
     last_X = 0;
     last_Y = 0;
   }
+  delay(1);
 }
 
 void refreshOffsetValuesAndSaveToEEPROM() {
