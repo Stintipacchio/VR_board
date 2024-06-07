@@ -1,4 +1,5 @@
 #include <ControllerDriver.h>
+#include <openvr_driver.h>
 #include <Windows.h>
 #include <Xinput.h>
 
@@ -55,6 +56,14 @@ DriverPose_t ControllerDriver::GetPose()
 	return pose;
 }
 
+vr::TrackedDevicePose_t GetHMDPose() {
+	vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount];
+	VRServerDriverHost()->GetRawTrackedDevicePoses(0, poses, vr::k_unMaxTrackedDeviceCount);
+
+	// L'HMD dovrebbe sempre avere l'ID 0
+	return poses[vr::k_unTrackedDeviceIndex_Hmd];
+}
+
 
 void ControllerDriver::RunFrame() {
 	XINPUT_STATE state;
@@ -65,9 +74,43 @@ void ControllerDriver::RunFrame() {
 		float xAxis = state.Gamepad.sThumbLX / 32768.0f; // Normalizza il valore tra -1 e 1
 		float yAxis = state.Gamepad.sThumbLY / 32768.0f; // Normalizza il valore tra -1 e 1
 
-		// Aggiorna i componenti scalari degli assi X e Y
-		VRDriverInput()->UpdateScalarComponent(joystickXHandle, xAxis, 0);
-		VRDriverInput()->UpdateScalarComponent(joystickYHandle, yAxis, 0);
+		// Ottieni la posa dell'HMD
+		vr::TrackedDevicePose_t hmdPose = GetHMDPose();
+
+		// Verifica se la posa è valida
+		if (hmdPose.bPoseIsValid) {
+			// Estrai la matrice di trasformazione dal TrackedDevicePose_t
+			vr::HmdMatrix34_t mat = hmdPose.mDeviceToAbsoluteTracking;
+
+			// Estrai i vettori forward e right dalla matrice
+			float forward[2] = { mat.m[2][0], mat.m[2][2] };
+			float right[2] = { mat.m[0][0], mat.m[0][2] };
+
+			// Normalizza i vettori
+			float forwardMagnitude = sqrt(forward[0] * forward[0] + forward[1] * forward[1]);
+			float rightMagnitude = sqrt(right[0] * right[0] + right[1] * right[1]);
+			forward[0] /= forwardMagnitude;
+			forward[1] /= forwardMagnitude;
+			right[0] /= rightMagnitude;
+			right[1] /= rightMagnitude;
+
+			// Ruota l'input del tappeto in base all'orientamento della testa
+			// Utilizzando una matrice di rotazione inversa
+			float rotatedX = -yAxis * forward[0] + xAxis * right[0];
+			float rotatedY = -yAxis * forward[1] + xAxis * right[1];
+
+			// Inverti l'asse delle y
+			rotatedY *= -1;
+
+			// Aggiorna i componenti scalari degli assi X e Y con i valori ruotati
+			VRDriverInput()->UpdateScalarComponent(joystickXHandle, rotatedX, 0);
+			VRDriverInput()->UpdateScalarComponent(joystickYHandle, rotatedY, 0);
+		}
+		else {
+			// Se la posa non è valida, usa i valori originali dell'analogico
+			VRDriverInput()->UpdateScalarComponent(joystickXHandle, xAxis, 0);
+			VRDriverInput()->UpdateScalarComponent(joystickYHandle, yAxis, 0);
+		}
 	}
 	else {
 		// Se non riesce a leggere lo stato del controller, potrebbe non essere connesso
@@ -75,6 +118,10 @@ void ControllerDriver::RunFrame() {
 		// o segnalando un errore
 	}
 }
+
+
+
+
 
 
 void ControllerDriver::Deactivate()

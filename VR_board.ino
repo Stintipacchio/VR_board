@@ -152,8 +152,8 @@ void setup() {
 
 int buttons_control(int val_BT, bool sign){
   if (val_BT == HIGH){
-    if (sign) return 50;
-    else return - 50;
+    if (sign) return 60;
+    else return - 60;
   }
   else if (val_BT == LOW){
     return 0;
@@ -186,6 +186,7 @@ float checkVariation(float currentValue, float lastValue, String label) {
 }
 
 void loop() {
+
   // Flags to track data readiness for each load cell
   static boolean newDataReady_R4 = false;
   static boolean newDataReady_R3 = false;
@@ -210,6 +211,17 @@ void loop() {
   newDataReady_B3 |= B3_LoadCell.update();
   newDataReady_B2 |= B2_LoadCell.update();
   newDataReady_B1 |= B1_LoadCell.update();
+
+  // Serial.println(newDataReady_R4);
+  // Serial.println(newDataReady_R3);
+  // Serial.println(newDataReady_R2);
+  // Serial.println(newDataReady_R1);
+
+  // Serial.println(newDataReady_B4);
+  // Serial.println(newDataReady_B3);
+  // Serial.println(newDataReady_B2);
+  // Serial.println(newDataReady_B1);
+
 
   // If all load cells have new data
   if (newDataReady_R4 && newDataReady_R3 && newDataReady_R2 && newDataReady_R1 &&
@@ -278,19 +290,72 @@ void loop() {
       // Update time
       t = millis();
 
+      float valid_R4 = 0;
+      float valid_R3 = 0;
+      float valid_R2 = 0;
+      float valid_R1 = 0;
+
+      float valid_B4 = 0;
+      float valid_B3 = 0;
+      float valid_B2 = 0;
+      float valid_B1 = 0;
+
+      if(val_BT_1 == HIGH){
+        valid_R4 = i_R4;
+      }
+      if(val_BT_2 == HIGH){
+        valid_R2 = i_R2;
+      }
+      if(val_BT_3 == HIGH){
+        valid_B4 = i_B4;
+      }
+      if(val_BT_4 == HIGH){
+        valid_B2 = i_B2;
+      }
+
+      if(val_BT_1 == HIGH && val_BT_2 == HIGH){
+        valid_R4 = i_R4;
+        valid_R3 = i_R3;
+        valid_R2 = i_R2;
+      }
+      if(val_BT_2 == HIGH && val_BT_3 == HIGH){
+        valid_R2 = i_R2;
+        valid_R1 = i_R1;
+        valid_B4 = i_B4;
+      }
+      if(val_BT_3 == HIGH && val_BT_4 == HIGH){
+        valid_B4 = i_B4;
+        valid_B3 = i_B3;
+        valid_B2 = i_B2;
+      }
+      if(val_BT_4 == HIGH && val_BT_1 == HIGH){
+        valid_B2 = i_B2;
+        valid_B1 = i_B1;
+        valid_R4 = i_R4;
+      }
+
       // Calculate joystick axes
-      X = (((i_B4 + (i_R1/2) + (i_B3/2)) - (i_R4 + (i_R3/2) + (i_B1/2)))*10) + buttons_control(val_BT_1, false) + buttons_control(val_BT_3, true);
-      Y = (((i_R2 + (i_R1/2) + (i_R3/2)) - (i_B2 + (i_B1/2) + (i_B3/2)))*10) + buttons_control(val_BT_2, true) + buttons_control(val_BT_4, false);
+      X = (((valid_B4 + (valid_R1/2) + (valid_B3/2)) - (valid_R4 + (valid_R3/2) + (valid_B1/2)))*10) + buttons_control(val_BT_1, false) + buttons_control(val_BT_3, true);
+      Y = (((valid_R2 + (valid_R1/2) + (valid_R3/2)) - (valid_B2 + (valid_B1/2) + (valid_B3/2)))*10) + buttons_control(val_BT_2, true) + buttons_control(val_BT_4, false);
 
       
       if (X < -100 || X > 100 || Y < -100 || Y > 100) Joystick.setButton(0, true);
       else Joystick.setButton(0, false);
 
       // Print of the coordinates
-      Serial.print("X coordinate: ");
-      Serial.println(X);
-      Serial.print("Y coordinate: ");
-      Serial.println(Y);
+      // Serial.print("X coordinate: ");
+      // Serial.println(X);
+      // Serial.print("Y coordinate: ");
+      // Serial.println(Y);
+
+      // Serial.print("BT_1: ");
+      // Serial.println(val_BT_1);
+      // Serial.print("BT_2: ");
+      // Serial.println(val_BT_2);
+      // Serial.print("BT_3: ");
+      // Serial.println(val_BT_3);
+      // Serial.print("BT_4: ");
+      // Serial.println(val_BT_4);
 
       // Set joystick axes
       Joystick.setXAxis(X);
